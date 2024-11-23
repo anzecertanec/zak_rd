@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Platform Game with Advanced Features</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+      background-color: #87CEEB;
+    }
+
+    canvas {
+      display: block;
+    }
+
+    #game-over {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 2em;
+      color: white;
+      text-align: center;
+      display: none;
+    }
+
+    #restart {
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      font-size: 1em;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<audio id="backgroundMusic" loop autoplay>
+  <source src="background-music.mp3" type="audio/mpeg">
+  Your browser does not support the audio element.
+</audio>
+<body>
+  <canvas id="gameCanvas"></canvas>
+  <div id="game-over">
+    <p>Game Over!</p>
+    <button id="restart">Restart</button>
+  </div>
+
+  <img id="playerImage" src="zak1.jpg" style="display:none;">
+  <img id="enemyImage1" src="anze.jpg" style="display:none;">
+  <img id="enemyImage2" src="anze2.jpg" style="display:none;">
+
+  <script>
+    backgroundMusic.play();
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const gameOverScreen = document.getElementById('game-over');
+    const restartButton = document.getElementById('restart');
+    const playerImage = document.getElementById('playerImage');
+    const enemyImage1 = document.getElementById('enemyImage1');
+    const enemyImage2 = document.getElementById('enemyImage2');
+
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    const gravity = 0.5;
+    let isGameOver = false;
+    let hasWon = false;
+
+    class Player {
+      constructor() {
+        this.width = 50;
+        this.height = 50;
+        this.x = canvas.width / 2 - this.width / 2;
+        this.y = canvas.height - this.height - 10;
+        this.dx = 0;
+        this.dy = 0;
+        this.speed = 5;
+        this.jumping = false;
+      }
+
+      draw() {
+        ctx.save();
+        ctx.strokeStyle = 'red';
+        ctx.lineWidth = 5;
+        ctx.strokeRect(this.x, this.y, this.width, this.height);
+
+        if (playerImage.complete) {
+          ctx.drawImage(playerImage, this.x, this.y, this.width, this.height);
+        }
+        ctx.restore();
+      }
+
+      update() {
+        this.x += this.dx;
+
+        if (this.x < 0) this.x = 0;
+        if (this.x + this.width > canvas.width) this.x = canvas.width - this.width;
+
+        this.y += this.dy;
+
+        if (this.y + this.height >= canvas.height - 10) {
+          this.y = canvas.height - this.height - 10;
+          this.jumping = false;
+          this.dy = 0;
+        } else {
+          this.dy += gravity;
+        }
+      }
+
+      moveLeft() {
+        this.dx = -this.speed;
+      }
+
+      moveRight() {
+        this.dx = this.speed;
+      }
+
+      stop() {
+        this.dx = 0;
+      }
+
+      jump() {
+        if (!this.jumping) {
+          this.dy = -13;
+          this.jumping = true;
+        }
+      }
+    }
+
+    class Platform {
+      constructor(x, y, width, height) {
+        this.x = x;
+        this.y = y;
+        this.width = width;
+        this.height = height;
+      }
+
+      draw() {
+        ctx.fillStyle = 'green';
+        ctx.fillRect(this.x, this.y, this.width, this.height);
+      }
+    }
+
+    class Enemy {
+      constructor(x, y, width, height, speed, image) {
+        this.x = x;
+        this.y = y;
+        this.width = width;
+        this.height = height;
+        this.speed = speed;
+        this.direction = 1;
+        this.image = image;
+      }
+
+      draw() {
+        ctx.save();
+        ctx.strokeStyle = 'purple';
+        ctx.lineWidth = 5;
+        ctx.strokeRect(this.x, this.y, this.width, this.height);
+
+        if (this.image.complete) {
+          ctx.drawImage(this.image, this.x, this.y, this.width, this.height);
+        }
+        ctx.restore();
+      }
+
+      update() {
+        this.x += this.speed * this.direction;
+
+        if (this.x <= 0 || this.x + this.width >= canvas.width) {
+          this.direction *= -1;
+        }
+      }
+
+      checkCollision(player) {
+        return (
+          player.x < this.x + this.width &&
+          player.x + player.width > this.x &&
+          player.y < this.y + this.height &&
+          player.y + player.height > this.y
+        );
+      }
+    }
+
+    class Goal {
+      constructor(x, y, width, height) {
+        this.x = x;
+        this.y = y;
+        this.width = width;
+        this.height = height;
+      }
+
+      draw() {
+        ctx.fillStyle = 'gold';
+        ctx.fillRect(this.x, this.y, this.width, this.height);
+      }
+
+      checkCollision(player) {
+        return (
+          player.x < this.x + this.width &&
+          player.x + player.width > this.x &&
+          player.y < this.y + this.height &&
+          player.y + player.height > this.y
+        );
+      }
+    }
+
+    const player = new Player();
+    const platforms = [
+      new Platform(50, canvas.height - 150, 200, 20),
+      new Platform(400, canvas.height - 200, 200, 20),
+      new Platform(700, canvas.height - 300, 200, 20),
+      new Platform(900, canvas.height - 400, 200, 20),
+      new Platform(500, canvas.height - 500, 200, 20),
+      new Platform(600, canvas.height - 600, 200, 20),
+      new Platform(800, canvas.height - 700, 200, 20)
+    ];
+
+    const enemies = [
+      new Enemy(120, canvas.height - 120, 50, 50, 4, enemyImage1),
+      new Enemy(420, canvas.height - 220, 50, 50, 4, enemyImage2),
+      new Enemy(420, canvas.height - 300, 50, 50, 8, enemyImage1),
+      new Enemy(420, canvas.height - 600, 150, 150, 14, enemyImage2),
+      new Enemy(320, canvas.height - 750, 20, 10, 25, enemyImage2),
+      new Enemy(420, canvas.height - 750, 20, 10, 20, enemyImage2),
+      new Enemy(500, canvas.height - 720, 20, 10, 20, enemyImage2)
+    ];
+
+    const goal = new Goal(700, canvas.height - 800, 50, 50);
+
+    function handleCollisions() {
+      for (const platform of platforms) {
+        if (
+          player.y + player.height <= platform.y &&
+          player.y + player.height + player.dy >= platform.y &&
+          player.x + player.width > platform.x &&
+          player.x < platform.x + platform.width
+        ) {
+          player.y = platform.y - player.height;
+          player.dy = 0;
+          player.jumping = false;
+        }
+      }
+
+      for (const enemy of enemies) {
+        if (enemy.checkCollision(player)) {
+          isGameOver = true;
+          gameOver();
+        }
+      }
+
+      if (goal.checkCollision(player)) {
+        hasWon = true;
+        gameWin();
+      }
+    }
+
+    function gameOver() {
+      isGameOver = true;
+      gameOverScreen.style.display = 'block';
+    }
+
+    function gameWin() {
+      hasWon = true;
+      window.location.href = "konec.html"; // Redirect to a new page
+    }
+
+    function restartGame() {
+      player.x = canvas.width / 2 - player.width / 2;
+      player.y = canvas.height - player.height - 10;
+      player.dx = 0;
+      player.dy = 0;
+      isGameOver = false;
+      hasWon = false;
+      gameOverScreen.style.display = 'none';
+      gameLoop();
+    }
+
+    function gameLoop() {
+      if (isGameOver || hasWon) return;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      player.update();
+      player.draw();
+
+      platforms.forEach(platform => platform.draw());
+      enemies.forEach(enemy => {
+        enemy.update();
+        enemy.draw();
+      });
+
+      goal.draw();
+
+      handleCollisions();
+
+      requestAnimationFrame(gameLoop);
+    }
+
+    let keys = {};
+    window.addEventListener('keydown', (event) => {
+      keys[event.key] = true;
+
+      if (keys['ArrowLeft']) {
+        player.moveLeft();
+      }
+
+      if (keys['ArrowRight']) {
+        player.moveRight();
+      }
+
+      if (keys['ArrowUp']) {
+        player.jump();
+      }
+    });
+
+    window.addEventListener('keyup', (event) => {
+      keys[event.key] = false;
+
+      if (!keys['ArrowLeft'] && !keys['ArrowRight']) {
+        player.stop();
+      }
+    });
+
+    restartButton.addEventListener('click', restartGame);
+
+    gameLoop();
+  </script>
+</body>
+</html>
+
